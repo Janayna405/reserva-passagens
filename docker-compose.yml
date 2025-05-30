@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: reserva-passagens-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app-network
+
+  app:
+    build: .
+    container_name: reserva-passagens-app
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      - DISPLAY=${DISPLAY}
+      - MONGO_URI=mongodb://mongodb:27017/
+    volumes:
+      - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    networks:
+      - app-network
+    tty: true
+    stdin_open: true
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local

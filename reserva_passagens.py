@@ -2,6 +2,8 @@
 # facilitar seu uso no código.
 import tkinter as tk
 from math import expm1
+import os
+import time
 
 # Importa submódulos ttk e messagebox do tkinter, utilizados
 # para criar widgets com estilos melhorados e exibir caixas de diálogo.
@@ -77,8 +79,25 @@ class Onibus:
         # com 0 (desocupado) para cada lugar baseado na capacidade.
         self.lugares = [0] * capacidade
 
-        # Cria um cliente MongoDB, conectando-se ao servidor MongoDB local padrão.
-        self.cliente = MongoClient("mongodb://localhost:27017/")
+        # Obtém a URI do MongoDB da variável de ambiente ou usa o valor padrão
+        mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
+
+        # Adiciona retry na conexão com o MongoDB
+        max_retries = 5
+        retry_delay = 5  # segundos
+        
+        for attempt in range(max_retries):
+            try:
+                # Cria um cliente MongoDB, conectando-se ao servidor MongoDB.
+                self.cliente = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+                # Testa a conexão
+                self.cliente.admin.command('ping')
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise Exception(f"Falha ao conectar ao MongoDB após {max_retries} tentativas: {str(e)}")
+                print(f"Tentativa {attempt + 1} de {max_retries} falhou. Tentando novamente em {retry_delay} segundos...")
+                time.sleep(retry_delay)
 
         # Seleciona o banco de dados 'reserva_onibus_db' dentro do servidor MongoDB.
         self.bd = self.cliente["reserva_onibus_db"]
@@ -585,7 +604,6 @@ class JanelaPrincipal:
     # Método construtor que inicializa uma nova instância da JanelaPrincipal com a
     # janela do sistema e uma instância do ônibus.
     def __init__(self, janela_sistema, onibus):
-
         # Armazena a referência da janela principal do sistema (tk.Tk())
         # passada como argumento.
         self.janela_sistema = janela_sistema
@@ -598,9 +616,12 @@ class JanelaPrincipal:
         # barra de título da janela.
         self.janela_sistema.title("Sistema de Reserva de Passagens")
 
-        # Configura o estado da janela para 'zoomed', fazendo com que
-        # ela maximize automaticamente quando for aberta.
-        self.janela_sistema.state('zoomed')
+        # Configura o estado da janela para maximizado
+        self.janela_sistema.attributes('-zoomed', True)  # Para Linux
+        try:
+            self.janela_sistema.state('zoomed')  # Para Windows
+        except:
+            pass
 
         # Define a cor de fundo da janela principal para um
         # cinza claro (#f0f0f0).
